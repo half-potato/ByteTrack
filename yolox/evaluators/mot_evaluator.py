@@ -1,4 +1,5 @@
 from collections import defaultdict
+from cv2 import trace
 from loguru import logger
 from tqdm import tqdm
 
@@ -24,9 +25,11 @@ import itertools
 import json
 import tempfile
 import time
+import traceback
 
 
 def write_results(filename, results):
+    logger.info(traceback.format_stack())
     save_format = '{frame},{id},{x1},{y1},{w},{h},{s},-1,-1,-1\n'
     with open(filename, 'w') as f:
         for frame_id, tlwhs, track_ids, scores in results:
@@ -501,6 +504,7 @@ class MOTEvaluator:
         ids = []
         data_list = []
         results = []
+        features = []
         video_names = defaultdict()
         progress_bar = tqdm if is_main_process() else iter
 
@@ -534,9 +538,12 @@ class MOTEvaluator:
                 if frame_id == 1:
                     tracker = OnlineTracker(model_folder, min_cls_score=self.args.track_thresh)
                     if len(results) != 0:
-                        result_filename = os.path.join(result_folder, '{}.txt'.format(video_names[video_id - 1]))
+                        result_filename = os.path.join(result_folder, '{}.txt'.format(video_names[video_id]))
+                        features_filename = os.path.join(result_folder, '{}.pth'.format(video_names[video_id]))
                         write_results(result_filename, results)
+                        torch.save(features_filename, features)
                         results = []
+                        features = []
 
                 imgs = imgs.type(tensor_type)
 
@@ -563,6 +570,7 @@ class MOTEvaluator:
             online_tlwhs = []
             online_ids = []
             online_scores = []
+            online_feats = {}
             for t in online_targets:
                 tlwh = t.tlwh
                 tid = t.track_id
@@ -571,8 +579,10 @@ class MOTEvaluator:
                     online_tlwhs.append(tlwh)
                     online_ids.append(tid)
                     online_scores.append(t.score)
+                    online_feats[tid] = t.curr_feature
             # save results
             results.append((frame_id, online_tlwhs, online_ids, online_scores))
+            features.append(online_feats)
 
             if is_time_record:
                 track_end = time_synchronized()
@@ -580,7 +590,9 @@ class MOTEvaluator:
             
             if cur_iter == len(self.dataloader) - 1:
                 result_filename = os.path.join(result_folder, '{}.txt'.format(video_names[video_id]))
+                features_filename = os.path.join(result_folder, '{}.pth'.format(video_names[video_id]))
                 write_results(result_filename, results)
+                torch.save(features_filename, features)
 
         statistics = torch.cuda.FloatTensor([inference_time, track_time, n_samples])
         if distributed:

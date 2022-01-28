@@ -21,6 +21,7 @@ class Evaluator(object):
         assert self.data_type == 'mot'
 
         gt_filename = os.path.join(self.data_root, self.seq_name, 'gt', 'gt.txt')
+        # format: dict that maps frame_id to list of (tlwh, target_id, score)
         self.gt_frame_dict = read_results(gt_filename, self.data_type, is_gt=True)
         self.gt_ignore_frame_dict = read_results(gt_filename, self.data_type, is_ignore=True)
 

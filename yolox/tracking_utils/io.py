@@ -101,16 +101,19 @@ def read_mot_results(filename, is_gt, is_ignore):
                 tlwh = tuple(map(float, linelist[2:6]))
                 target_id = int(linelist[1])
 
-                results_dict[fid].append((tlwh, target_id, score))
+                results_dict[fid].append((tlwh, target_id, score, label))
 
     return results_dict
 
 
-def unzip_objs(objs):
+def unzip_objs(objs, ret_labels=False):
     if len(objs) > 0:
-        tlwhs, ids, scores = zip(*objs)
+        tlwhs, ids, scores, labels = zip(*objs)
     else:
-        tlwhs, ids, scores = [], [], []
+        tlwhs, ids, scores, labels = [], [], [], []
     tlwhs = np.asarray(tlwhs, dtype=float).reshape(-1, 4)
 
-    return tlwhs, ids, scores
+    if ret_labels:
+        return tlwhs, list(ids), scores, labels
+    else:
+        return tlwhs, list(ids), scores
